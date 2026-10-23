@@ -13,6 +13,10 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "status": 404
+    },
+    {
       "src": "/static/(.*)",
       "dest": "/static/$1"
     },

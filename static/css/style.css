@@ -243,6 +243,31 @@ body {
   color: var(--text-muted);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
+.btn-cam-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 25;
+  padding: 12px 24px;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 30px;
+  box-shadow: 0 6px 24px rgba(14, 165, 233, 0.45);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-cam-overlay:hover {
+  transform: translate(-50%, -53%) scale(1.05);
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.6);
+}
 .video-no-face svg { opacity: 0.4; }
 .video-no-face p   { font-size: 0.95rem; font-weight: 500; }
 .video-no-face small { font-size: 0.75rem; opacity: 0.6; }

@@ -317,37 +317,45 @@ let clientTracker = null;
 let isClientMode  = false;
 
 async function checkModeAndStart() {
-  try {
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 1200);
-    const r = await fetch("/api/status", { signal: ctrl.signal });
-    clearTimeout(timeout);
-    if (r.ok) {
-      // Server is running! Use Server Mode
-      console.log("[AttentionAI] Server mode detected. Connecting to Python backend...");
-      setInterval(pollStatus,   CONFIG.POLL_STATUS_MS);
-      setInterval(pollSession,  CONFIG.POLL_SESSION_MS);
-      setInterval(pollTimeline, CONFIG.POLL_TIMELINE_MS);
-      pollStatus();
-      pollSession();
-      pollTimeline();
-      framePollLoop();
-      return;
-    }
-  } catch (_) {}
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
-  // Fallback: Browser-Native Client Mode (for Vercel & static web)
+  if (isLocal) {
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 1200);
+      const r = await fetch("/api/status", { signal: ctrl.signal });
+      clearTimeout(timeout);
+      const contentType = r.headers.get("content-type") || "";
+      if (r.ok && contentType.includes("application/json")) {
+        const data = await r.json();
+        if (data && (data.state !== undefined || data.face_detected !== undefined)) {
+          console.log("[AttentionAI] Server mode detected. Connecting to Python backend...");
+          setInterval(pollStatus,   CONFIG.POLL_STATUS_MS);
+          setInterval(pollSession,  CONFIG.POLL_SESSION_MS);
+          setInterval(pollTimeline, CONFIG.POLL_TIMELINE_MS);
+          pollStatus();
+          pollSession();
+          pollTimeline();
+          framePollLoop();
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Running on Vercel or cloud static host -> Browser-Native Client Mode
   startClientMode();
 }
 
 async function startClientMode() {
-  if (isClientMode) return;
+  if (isClientMode && clientTracker && clientTracker.isRunning) return;
   isClientMode = true;
   console.log("[AttentionAI] Activating Browser-Native Client-Side WebTracker...");
 
-  if (!window.WebTracker) {
-    showToast("⚠️ Loading MediaPipe tracker...", 3000);
-  }
+  const startBtn = document.getElementById("btnStartCam");
+  if (startBtn) startBtn.style.display = "none";
+
+  liveLabel.textContent = "Requesting Cam…";
 
   clientTracker = new window.WebTracker(videoCanvas);
   const started = await clientTracker.start({
@@ -365,7 +373,14 @@ async function startClientMode() {
       drawTimeline(timelineData);
     },
     onError: (err) => {
-      showToast("❌ Camera permission required", 5000);
+      console.warn("Client tracker error:", err);
+      liveLabel.textContent = "Camera Blocked";
+      liveDot.classList.remove("active");
+      if (startBtn) {
+        startBtn.style.display = "inline-flex";
+        startBtn.textContent = "📹 Click to Enable Camera";
+      }
+      showToast("❌ Camera permission required. Please allow camera access.", 5000);
     }
   });
 
@@ -373,7 +388,16 @@ async function startClientMode() {
     showToast("🎥 Camera active — AI tracking live!", 3000);
     liveDot.classList.add("active");
     liveLabel.textContent = "Live (Web AI)";
+    if (startBtn) startBtn.style.display = "none";
   }
+}
+
+// Bind Start Camera button
+const btnStartCam = document.getElementById("btnStartCam");
+if (btnStartCam) {
+  btnStartCam.addEventListener("click", () => {
+    startClientMode();
+  });
 }
 
 // ── Polling ──────────────────────────────────────────────────────

@@ -88,12 +88,24 @@
       this.callbacks = callbacks;
       this.isRunning = true;
 
+      // Draw initial loading indicator on canvas
+      this.ctx.fillStyle = "#070b12";
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.fillStyle = "#6ee7f7";
+      this.ctx.font = "14px Inter, sans-serif";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Requesting camera access…", this.canvas.width / 2, this.canvas.height / 2);
+
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("getUserMedia is not supported by your browser");
+        }
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
           audio: false,
         });
         this.video.srcObject = stream;
+        this.video.muted = true;
         await this.video.play();
       } catch (err) {
         console.error("Camera access failed:", err);
@@ -101,9 +113,19 @@
         return false;
       }
 
-      // Initialize MediaPipe FaceMesh
+      this.ctx.fillText("Loading MediaPipe FaceMesh AI…", this.canvas.width / 2, this.canvas.height / 2);
+
+      // Wait for MediaPipe FaceMesh script if still loading from CDN
+      let waitCount = 0;
+      while (typeof window.FaceMesh === "undefined" && waitCount < 50) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+      }
+
       if (typeof window.FaceMesh === "undefined") {
-        console.error("MediaPipe FaceMesh script not loaded!");
+        const err = new Error("MediaPipe FaceMesh script not loaded from CDN");
+        console.error(err);
+        if (callbacks.onError) callbacks.onError(err);
         return false;
       }
 
@@ -121,10 +143,18 @@
       this.faceMesh.onResults(this.onResults.bind(this));
 
       // Continuous loop
+      let isProcessing = false;
       const processFrame = async () => {
         if (!this.isRunning) return;
-        if (this.video.readyState >= 2) {
-          await this.faceMesh.send({ image: this.video });
+        if (this.video.readyState >= 2 && !isProcessing) {
+          isProcessing = true;
+          try {
+            await this.faceMesh.send({ image: this.video });
+          } catch (e) {
+            console.warn("FaceMesh send error:", e);
+          } finally {
+            isProcessing = false;
+          }
         }
         requestAnimationFrame(processFrame);
       };
