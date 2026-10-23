@@ -374,13 +374,22 @@ async function startClientMode() {
     },
     onError: (err) => {
       console.warn("Client tracker error:", err);
-      liveLabel.textContent = "Camera Blocked";
       liveDot.classList.remove("active");
-      if (startBtn) {
-        startBtn.style.display = "inline-flex";
-        startBtn.textContent = "📹 Click to Enable Camera";
+      if (err && (err.name === "NotReadableError" || err.message?.includes("Device in use"))) {
+        liveLabel.textContent = "Camera Busy";
+        if (startBtn) {
+          startBtn.style.display = "inline-flex";
+          startBtn.textContent = "🔄 Camera In Use — Click to Retry";
+        }
+        showToast("⚠️ Webcam is locked by another app or tab (e.g. Zoom, Meet, Teams, or another browser window). Please close it and click Retry!", 8000);
+      } else {
+        liveLabel.textContent = "Camera Blocked";
+        if (startBtn) {
+          startBtn.style.display = "inline-flex";
+          startBtn.textContent = "📹 Click to Enable Camera";
+        }
+        showToast("❌ Camera permission required. Please allow camera access.", 5000);
       }
-      showToast("❌ Camera permission required. Please allow camera access.", 5000);
     }
   });
 

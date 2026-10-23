@@ -96,14 +96,33 @@
       this.ctx.textAlign = "center";
       this.ctx.fillText("Requesting camera access…", this.canvas.width / 2, this.canvas.height / 2);
 
+      // Clean up previous active stream if any
+      if (this.stream) {
+        try { this.stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        this.stream = null;
+      }
+      if (this.video && this.video.srcObject) {
+        try { this.video.srcObject.getTracks().forEach(t => t.stop()); } catch (_) {}
+        this.video.srcObject = null;
+      }
+
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error("getUserMedia is not supported by your browser");
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-          audio: false,
-        });
+
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+            audio: false,
+          });
+        } catch (firstErr) {
+          console.warn("Retrying with simple video constraint...", firstErr);
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+
+        this.stream = stream;
         this.video.srcObject = stream;
         this.video.muted = true;
         await this.video.play();
