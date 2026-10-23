@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Session data
+data/
+sessions/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Models (large binary files — downloaded on startup)
+models/
+
+# MP3 scratch files
+*.mp3
