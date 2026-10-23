@@ -312,8 +312,73 @@ function drawTimeline(records) {
   timelineCtx.fillText("Drowsy    ─", 6, 0.9 * ch + 3);
 }
 
+// ── Mode Handling (Server vs Client-Side WebTracker) ────────────────
+let clientTracker = null;
+let isClientMode  = false;
+
+async function checkModeAndStart() {
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 1200);
+    const r = await fetch("/api/status", { signal: ctrl.signal });
+    clearTimeout(timeout);
+    if (r.ok) {
+      // Server is running! Use Server Mode
+      console.log("[AttentionAI] Server mode detected. Connecting to Python backend...");
+      setInterval(pollStatus,   CONFIG.POLL_STATUS_MS);
+      setInterval(pollSession,  CONFIG.POLL_SESSION_MS);
+      setInterval(pollTimeline, CONFIG.POLL_TIMELINE_MS);
+      pollStatus();
+      pollSession();
+      pollTimeline();
+      framePollLoop();
+      return;
+    }
+  } catch (_) {}
+
+  // Fallback: Browser-Native Client Mode (for Vercel & static web)
+  startClientMode();
+}
+
+async function startClientMode() {
+  if (isClientMode) return;
+  isClientMode = true;
+  console.log("[AttentionAI] Activating Browser-Native Client-Side WebTracker...");
+
+  if (!window.WebTracker) {
+    showToast("⚠️ Loading MediaPipe tracker...", 3000);
+  }
+
+  clientTracker = new window.WebTracker(videoCanvas);
+  const started = await clientTracker.start({
+    onStatus: (data) => {
+      applyStatus(data);
+      if (typeof window.handleAlerts === "function") {
+        window.handleAlerts(data.state, 100);
+      }
+    },
+    onSession: (summary) => {
+      applySession(summary);
+    },
+    onTimeline: (timeline) => {
+      timelineData = timeline;
+      drawTimeline(timelineData);
+    },
+    onError: (err) => {
+      showToast("❌ Camera permission required", 5000);
+    }
+  });
+
+  if (started) {
+    showToast("🎥 Camera active — AI tracking live!", 3000);
+    liveDot.classList.add("active");
+    liveLabel.textContent = "Live (Web AI)";
+  }
+}
+
 // ── Polling ──────────────────────────────────────────────────────
 async function pollStatus() {
+  if (isClientMode) return;
   try {
     const r = await fetch("/api/status");
     if (!r.ok) throw new Error();
@@ -332,6 +397,7 @@ async function pollStatus() {
 }
 
 async function pollSession() {
+  if (isClientMode) return;
   try {
     const r = await fetch("/api/session_summary");
     if (r.ok) applySession(await r.json());
@@ -339,6 +405,7 @@ async function pollSession() {
 }
 
 async function pollTimeline() {
+  if (isClientMode) return;
   try {
     const r = await fetch("/api/timeline");
     if (r.ok) {
@@ -350,6 +417,16 @@ async function pollTimeline() {
 
 // ── Reset Session ─────────────────────────────────────────────────
 btnReset.addEventListener("click", async () => {
+  if (isClientMode && clientTracker) {
+    clientTracker.reset();
+    startTimer();
+    timelineData = [];
+    drawDonut(0, 0, 0);
+    drawTimeline([]);
+    showToast("✅ Session reset successfully");
+    return;
+  }
+
   try {
     await fetch("/api/reset_session", { method: "POST" });
     startTimer();
@@ -368,6 +445,19 @@ if (btnExportCSV) {
     btnExportCSV.classList.add("downloading");
     btnExportCSV.textContent = "⏳ Downloading...";
     try {
+      if (isClientMode && clientTracker) {
+        const csvContent = clientTracker.exportCSV();
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `attentionai_session_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("📅 Session exported successfully");
+        return;
+      }
+
       const resp = await fetch("/api/export_csv");
       if (!resp.ok) throw new Error("export failed");
       const blob     = await resp.blob();
@@ -394,7 +484,7 @@ if (btnExportCSV) {
 let framePollActive = true;
 
 async function framePollLoop() {
-  while (framePollActive) {
+  while (framePollActive && !isClientMode) {
     try {
       const r = await fetch("/api/frame", { cache: "no-store" });
       if (!r.ok) throw new Error("frame fetch failed");
@@ -408,6 +498,7 @@ async function framePollLoop() {
       videoCtx.drawImage(bmp, 0, 0);
       bmp.close();
     } catch (e) {
+      if (isClientMode) break;
       // Draw a subtle "reconnecting" overlay on the canvas
       videoCtx.fillStyle = "#080c14";
       videoCtx.fillRect(0, 0, videoCanvas.width, videoCanvas.height);
@@ -426,14 +517,7 @@ startTimer();
 drawDonut(0, 0, 0);
 drawTimeline([]);
 
-setInterval(pollStatus,   CONFIG.POLL_STATUS_MS);
-setInterval(pollSession,  CONFIG.POLL_SESSION_MS);
-setInterval(pollTimeline, CONFIG.POLL_TIMELINE_MS);
-
-pollStatus();
-pollSession();
-pollTimeline();
-framePollLoop();   // start canvas video feed
+checkModeAndStart();
 
 // Resize timeline on window resize
 window.addEventListener("resize", () => drawTimeline(timelineData));

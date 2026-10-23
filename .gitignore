@@ -30,3 +30,8 @@ models/
 
 # MP3 scratch files
 *.mp3
+
+# Vercel
+.vercel/
+
+.vercel

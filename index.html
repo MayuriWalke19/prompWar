@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attention Tracker — Real-Time Focus Analysis</title>
+  <meta name="description" content="Real-time AI-powered attention tracking system that detects focus, distraction, and drowsiness using eye tracking, gaze analysis, and head pose estimation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <!-- Background particles -->
+  <div class="bg-particles" id="bgParticles"></div>
+
+  <!-- ── HEADER ──────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="13" stroke="url(#g1)" stroke-width="2"/>
+          <circle cx="14" cy="14" r="6" fill="url(#g1)" opacity="0.8"/>
+          <circle cx="14" cy="14" r="2.5" fill="#fff"/>
+          <defs>
+            <linearGradient id="g1" x1="0" y1="0" x2="28" y2="28">
+              <stop offset="0%" stop-color="#6ee7f7"/>
+              <stop offset="100%" stop-color="#a78bfa"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-name">AttentionAI</h1>
+        <span class="brand-sub">Real-Time Focus Tracker</span>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="live-dot" id="liveDot"></div>
+      <span class="live-label" id="liveLabel">Connecting…</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-enable-audio" id="btnEnableAudio" title="Click to enable alert sounds">
+        🔔 Enable Audio
+      </button>
+      <button class="btn btn-ghost" id="btnReset" title="Reset session">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        Reset Session
+      </button>
+    </div>
+  </header>
+
+  <!-- ── WARNING BANNER ──────────────────────────────── -->
+  <div class="warning-banner hidden" id="warningBanner" role="alert">
+    <span class="warning-icon" id="warningIcon">⚠️</span>
+    <span class="warning-text" id="warningText">Warning</span>
+    <div class="warning-actions">
+      <button class="btn-dismiss" id="btnDismiss" title="Dismiss">✕</button>
+    </div>
+  </div>
+
+  <!-- ── MAIN LAYOUT ─────────────────────────────────── -->
+  <main class="main-grid">
+
+    <!-- Left: Video Feed -->
+    <section class="video-section">
+      <div class="video-card">
+        <div class="video-header">
+          <span class="section-label">📹 Live Feed</span>
+          <div class="fps-badge" id="fpsBadge">— FPS</div>
+        </div>
+        <div class="video-wrapper" id="videoWrapper">
+          <canvas id="videoCanvas" width="640" height="480"></canvas>
+          <div class="video-no-face hidden" id="noFaceOverlay">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+            <p>No face detected</p>
+            <small>Ensure your face is in frame and well-lit</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Dashboard -->
+    <aside class="dashboard">
+
+      <!-- ── State Card ── -->
+      <div class="state-card" id="stateCard">
+        <div class="state-icon" id="stateIcon">👁️</div>
+        <div class="state-info">
+          <div class="state-label" id="stateLabel">Initializing…</div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-bar" id="confidenceBar"></div>
+          </div>
+          <div class="confidence-text" id="confidenceText">Confidence: —</div>
+        </div>
+      </div>
+
+      <!-- ── Metrics Row ── -->
+      <div class="metrics-grid">
+        <div class="metric-card" id="metricEar">
+          <div class="metric-value" id="earValue">—</div>
+          <div class="metric-label">Eye Aspect Ratio</div>
+          <div class="metric-bar-wrap"><div class="metric-bar" id="earBar"></div></div>
+        </div>
+        <div class="metric-card" id="metricBlink">
+          <div class="metric-value" id="blinkValue">—</div>
+          <div class="metric-label">Blinks / min</div>
+        </div>
+        <div class="metric-card" id="metricGaze">
+          <div class="metric-icon" id="gazeIcon">👁</div>
+          <div class="metric-value" id="gazeValue">—</div>
+          <div class="metric-label">Gaze Direction</div>
+        </div>
+      </div>
+
+      <!-- ── Head Pose ── -->
+      <div class="pose-card">
+        <div class="section-label">🔄 Head Pose</div>
+        <div class="pose-metrics">
+          <div class="pose-metric">
+            <div class="pose-label">Yaw</div>
+            <div class="pose-gauge" id="gaugeYaw">
+              <div class="gauge-track"><div class="gauge-fill" id="gaugeYawFill"></div></div>
+              <div class="pose-value" id="yawValue">0°</div>
+            </div>
+          </div>
+          <div class="pose-metric">
+            <div class="pose-label">Pitch</div>
+            <div class="pose-gauge" id="gaugePitch">
+              <div class="gauge-track"><div class="gauge-fill" id="gaugePitchFill"></div></div>
+              <div class="pose-value" id="pitchValue">0°</div>
+            </div>
+          </div>
+          <div class="pose-metric">
+            <div class="pose-label">Roll</div>
+            <div class="pose-gauge" id="gaugeRoll">
+              <div class="gauge-track"><div class="gauge-fill" id="gaugeRollFill"></div></div>
+              <div class="pose-value" id="rollValue">0°</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Session Summary ── -->
+      <div class="session-card">
+        <div class="section-label">📊 Session Summary</div>
+        <div class="session-timer" id="sessionTimer">00:00:00</div>
+        <div class="donut-wrap">
+          <canvas id="donutChart" width="160" height="160"></canvas>
+          <div class="donut-center" id="donutCenter">
+            <div class="donut-pct" id="focusedPct">—</div>
+            <div class="donut-sub">Focused</div>
+          </div>
+        </div>
+        <div class="session-legend">
+          <div class="legend-item"><span class="legend-dot focused"></span>Focused <span id="lgFocused">—%</span></div>
+          <div class="legend-item"><span class="legend-dot distracted"></span>Distracted <span id="lgDistracted">—%</span></div>
+          <div class="legend-item"><span class="legend-dot drowsy"></span>Drowsy <span id="lgDrowsy">—%</span></div>
+        </div>
+
+        <!-- ── Performance Highlights ── -->
+        <div class="session-highlights">
+          <div class="highlight-row" id="hlFocusStreak">
+            <span class="hl-icon">🏆</span>
+            <div class="hl-info">
+              <div class="hl-label">Best Focus Streak</div>
+              <div class="hl-value" id="hlFocusStreakVal">—</div>
+            </div>
+          </div>
+          <div class="highlight-row" id="hlDistract">
+            <span class="hl-icon">📉</span>
+            <div class="hl-info">
+              <div class="hl-label">Longest Distraction</div>
+              <div class="hl-value" id="hlDistractVal">—</div>
+            </div>
+          </div>
+          <div class="highlight-row" id="hlScore">
+            <span class="hl-icon">📊</span>
+            <div class="hl-info">
+              <div class="hl-label">Avg Attention Score</div>
+              <div class="hl-value" id="hlScoreVal">—</div>
+            </div>
+            <div class="hl-bar-wrap">
+              <div class="hl-bar" id="hlScoreBar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Export -->
+        <button class="btn btn-export" id="btnExportCSV" title="Download session report as CSV">
+          📅 Export CSV
+        </button>
+
+      </div>
+
+      <!-- ── Timeline Chart ── -->
+      <div class="timeline-card">
+        <div class="section-label">📈 Attention Timeline</div>
+        <canvas id="timelineChart" height="80"></canvas>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ── TOAST ─────────────────────────────────────── -->
+  <div class="toast hidden" id="toast"></div>
+
+  <!-- MediaPipe FaceMesh from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+  <script src="/static/js/alerts.js"></script>
+  <script src="/static/js/web_tracker.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
